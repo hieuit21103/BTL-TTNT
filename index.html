@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" href="xiangqiboardjs-0.3.3/css/xiangqiboard-0.3.3.min.css" />
+</head>
+
+<body>
+    <div class="container container-fluid">
+        <div class="row" style="margin-top: 25px;">
+            <div class="col col-sm-6">
+                <div id="myBoard">
+                </div>
+            </div>
+            <div class=" col col-sm-6" style="background-color: rgb(38,37,34);">
+                <ul>
+                    <br>
+                    <li><button type="button" class="btn btn-success" style="width: 90%;" data-bs-toggle="modal" data-bs-target="#myModal">Bắt đầu</button></li>
+                    <li>
+                    </li>
+                </ul>
+                <div class="moves-log">
+                    <textarea id="log" readonly></textarea>
+                </div>
+                <div id="status"></div>
+            </div>
+        </div>
+        <div class="modal fade" id="myModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">Chọn độ khó</h4>
+                        <button type="button" class="close" data-bs-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <select class="form-select" id="difficulty">
+                            <option value="easy" selected>Dễ</option>
+                            <option value="medium">Trung Bình</option>
+                            <option value="hard">Khó</option>
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="start()">Xác nhận</button>
+                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+    body {
+        background-color: rgb(50, 50, 47);
+    }
+
+    #log {
+        color: #fff;
+        width: 85%;
+        height: 600px;
+        margin-left: 5%;
+        background-color: rgb(50, 50, 47);
+        font-family: "Courier New";
+    }
+
+    #myBoard {
+        width: 100%;
+        display: flex;
+        position: relative;
+    }
+
+    .row {
+        height: auto;
+    }
+
+    li {
+        margin-bottom: 20px;
+    }
+
+    ul {
+        list-style: none;
+    }
+
+    select {}
+    </style>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="https://cotuong.r.worldssl.net/js/xiangqi.js?v=33"></script>
+    <script src="xiangqiboardjs-0.3.3/js/xiangqiboard-0.3.3.min.js"></script>
+    <script>
+    let board = Xiangqiboard('myBoard');
+    let game = new Xiangqi();
+    let $status = $('#status');
+    const INFINITY = 50000;
+    const pieceDefinition = {
+        rP: "Tốt đỏ",
+        bP: "Tốt đen",
+        rR: "Xe đỏ",
+        bR: "Xe đen",
+        rN: "Mã đỏ",
+        bN: "Mã đen",
+        rB: "Tượng đỏ",
+        bB: "Tượng đen",
+        rA: "Sĩ đỏ",
+        bA: "Sĩ đen",
+        rK: "Tướng đỏ",
+        bK: "Tướng đen",
+        rC: "Pháo đỏ",
+        bC: "Pháo đen"
+    }
+
+    function reverseArray(array) {
+        return array.slice().reverse();
+    }
+
+    function onDragStart(source, piece, position, orientation) {
+        // do not pick up pieces if the game is over
+        if (game.game_over()) return false;
+
+        // only pick up pieces for Red
+        if (piece.search(/^b/) !== -1) return false;
+    }
+
+    const rsoldierTable = [
+        [0, 3, 6, 9, 12, 9, 6, 3, 0],
+        [18, 36, 56, 80, 120, 80, 56, 36, 18],
+        [14, 26, 42, 60, 80, 60, 42, 26, 14],
+        [10, 20, 30, 34, 40, 34, 30, 20, 10],
+        [6, 12, 18, 18, 20, 18, 18, 12, 6],
+        [2, 0, 8, 0, 8, 0, 8, 0, 2],
+        [0, 0, -2, 0, 4, 0, -2, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+
+    const bsoldierTable = reverseArray(rsoldierTable);
+
+    const rchariotTable = [
+        [14, 14, 12, 18, 16, 18, 12, 14, 14],
+        [16, 20, 18, 24, 26, 24, 18, 20, 16],
+        [12, 12, 12, 18, 18, 18, 12, 12, 12],
+        [12, 18, 16, 22, 22, 22, 16, 18, 12],
+        [12, 14, 12, 18, 18, 18, 12, 14, 12],
+        [12, 16, 14, 20, 20, 20, 14, 16, 12],
+        [6, 10, 8, 14, 14, 14, 8, 10, 6],
+        [4, 8, 6, 14, 12, 14, 6, 8, 4],
+        [8, 4, 8, 16, 8, 16, 8, 4, 8],
+        [-2, 10, 6, 14, 12, 14, 6, 10, -2],
+
+    ];
+
+    const bchariotTable = reverseArray(rchariotTable);
+
+    const rcannonTable = [
+        [4, 8, 16, 12, 4, 12, 16, 8, 4],
+        [4, 10, 28, 16, 8, 16, 28, 10, 4],
+        [12, 14, 16, 20, 18, 20, 16, 14, 12],
+        [8, 24, 18, 24, 20, 24, 18, 24, 8],
+        [6, 16, 14, 18, 16, 18, 14, 16, 6],
+        [4, 12, 16, 14, 12, 14, 16, 12, 4],
+        [2, 6, 8, 6, 10, 6, 8, 6, 2],
+        [4, 2, 8, 8, 4, 8, 8, 2, 4],
+        [0, 2, 4, 4, -2, 4, 4, 2, 0],
+        [0, -4, 0, 0, 0, 0, 0, -4, 0],
+
+    ];
+
+    const bcannonTable = reverseArray(rcannonTable);
+
+    const rhorseTable = [
+        [6, 4, 0, -10, -12, -10, 0, 4, 6],
+        [2, 2, 0, -4, -14, -4, 0, 2, 2],
+        [2, 2, 0, -10, -8, -10, 0, 2, 2],
+        [0, 0, -2, 4, 10, 4, -2, 0, 0],
+        [0, 0, 0, 2, 8, 2, 0, 0, 0],
+        [-2, 0, 4, 2, 6, 2, 4, 0, -2],
+        [0, 0, 0, 2, 4, 2, 0, 0, 0],
+        [4, 0, 8, 6, 10, 6, 8, 0, 4],
+        [0, 2, 4, 6, 6, 6, 4, 2, 0],
+        [0, 0, 2, 6, 6, 6, 2, 0, 0],
+
+    ];
+
+    const bhorseTable = reverseArray(rhorseTable);
+
+    function evaluateBoard(board) {
+        var totalEvaluation = 0;
+        for (var i = 0; i < 10; i++) {
+            for (var j = 0; j < 9; j++) {
+                totalEvaluation = totalEvaluation + getPieceValue(board[i][j], i, j);
+            }
+        }
+        return totalEvaluation;
+    }
+
+
+
+    function getPieceValue(piece, x, y) {
+        if (piece === null) {
+            return 0;
+        }
+        var getAbsoluteValue = function(piece, isRed, x, y) {
+            if (piece.type === 'p') { //tốt
+                return 30 + (isRed ? rsoldierTable[x][y] : bsoldierTable[x][y]);
+            } else if (piece.type === 'r') { //Xe
+                return 600 + (isRed ? rchariotTable[x][y] : bchariotTable[x][y]);
+            } else if (piece.type === 'c') { //pháo
+                return 285 + (isRed ? rcannonTable[x][y] : bcannonTable[x][y]);
+            } else if (piece.type === 'n') { // mã
+                return 270 + (isRed ? rhorseTable[x][y] : bhorseTable[x][y]);
+            } else if (piece.type === 'b') { // tượng
+                return 120;
+            } else if (piece.type === 'a') { // sỹ
+                return 120;
+            } else if (piece.type === 'k') { // tướng
+                return 6000;
+            }
+            throw "Unknown piece type: " + piece.type;
+        };
+
+        var absoluteValue = getAbsoluteValue(piece, piece.color === 'r', x, y);
+        return piece.color === 'r' ? absoluteValue : -absoluteValue;
+    }
+
+    function minimaxRoot(depth, game, isMaximisingPlayer) {
+        var newGameMoves = game.moves();
+        var bestMove = -9999;
+        var bestMoveFound;
+
+        for (var i = 0; i < newGameMoves.length; i++) {
+            var newGameMove = newGameMoves[i]
+            game.move(newGameMove);
+            var value = minimax(depth - 1, game, -INFINITY, INFINITY, !isMaximisingPlayer);
+            game.undo();
+            if (value >= bestMove) {
+                bestMove = value;
+                bestMoveFound = newGameMove;
+            }
+        }
+        return bestMoveFound;
+    }
+
+    function minimax(depth, game, alpha, beta, isMaximisingPlayer) {
+
+        if (depth === 0) {
+            return -evaluateBoard(game.board());
+        }
+
+        var newGameMoves = game.moves();
+
+        if (isMaximisingPlayer) {
+            var bestMove = -9999;
+            for (var i = 0; i < newGameMoves.length; i++) {
+                game.move(newGameMoves[i]);
+                bestMove = Math.max(bestMove, minimax(depth - 1, game, alpha, beta, !isMaximisingPlayer));
+                game.undo();
+                alpha = Math.max(alpha, bestMove);
+                if (beta <= alpha) {
+                    return bestMove;
+                }
+            }
+            return bestMove;
+        } else {
+            var bestMove = 9999;
+            for (var i = 0; i < newGameMoves.length; i++) {
+                game.move(newGameMoves[i]);
+                bestMove = Math.min(bestMove, minimax(depth - 1, game, alpha, beta, !isMaximisingPlayer));
+                game.undo();
+                beta = Math.min(beta, bestMove);
+                if (beta <= alpha) {
+                    return bestMove;
+                }
+            }
+            return bestMove;
+        }
+    }
+
+    function getBestMoveMaxi(game) {
+        updateStatus();
+        var depth = getDifficulty();
+        var bestMove = minimaxRoot(depth, game, true);
+        if (bestMove == null) {
+            updateStatus();
+        }
+        return bestMove;
+    }
+
+    function makeMove() {
+        var bestMove = getBestMoveMaxi(game);
+        game.move(bestMove);
+        board.position(game.fen());
+        updateStatus();
+    }
+
+
+    function onDrop(source, target) {
+        // see if the move is legal
+        let move = game.move({
+            from: source,
+            to: target,
+        });
+        // illegal move
+        if (move === null) return 'snapback';
+        window.setTimeout(makeMove, 250);
+    }
+
+    // update the board position after the piece snap
+    // for castling, en passant, pawn promotion*/
+
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+
+    var count = 1;
+    function onChange(oldPos, newPos) {
+        const keys = Object.keys(oldPos);
+        const keys1 = Object.keys(newPos);
+        for (const key of keys) {
+            if (!(key in newPos)) {
+                for (const key of keys1) {
+                    if (!(key in oldPos)) {
+                        var newMove = key;
+                        document.getElementById('log').value += "Lượt thứ "+count+": "+pieceDefinition[newPos[newMove]] + " đến " + newMove.toUpperCase() + "\n" ;
+                        document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+                        count++;
+                    }
+                }
+            } else if (oldPos[key] !== newPos[key]) {
+                document.getElementById('log').value += "Lượt thứ "+count+": "+pieceDefinition[newPos[key]] + " đến " + key.toUpperCase() + "\n" ;
+                document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+                count++;
+            }
+        }
+
+        let status = '';
+
+        let moveColor = 'Đỏ';
+
+        if (game.turn() === 'b') {
+            moveColor = 'Đen';
+        }
+
+        // checkmate?
+        if (game.in_checkmate()) {
+            status = 'Game kết thúc, ' + moveColor + ' thua';
+            document.getElementById('log').value += status+"\n";
+        }
+
+        // draw?
+        else if (game.in_draw()) {
+            status = 'Game kết thúc, cờ hoà';
+            document.getElementById('log').value += status+"\n";
+            count++;
+        }
+
+        if (game.in_check()) {
+            status = moveColor + ' Đang bị chiếu tưóng';
+            document.getElementById('log').value += status+"\n";
+            count++;
+        }
+    }
+
+    function getDifficulty() {
+        var value = document.getElementById('difficulty').value;
+        var diff = {
+            "easy": 1,
+            "medium": 2,
+            "hard": 4
+        }
+        return diff[value];
+    }
+
+    function updateStatus() {
+        let status = '';
+
+        let moveColor = 'Red';
+        if (game.turn() === 'b') {
+            moveColor = 'Black';
+        }
+
+        // checkmate?
+        if (game.in_checkmate()) {
+            status = 'Game over, ' + moveColor + ' is in checkmate.';
+        }
+
+        // draw?
+        else if (game.in_draw()) {
+            status = 'Game over, drawn position';
+        }
+
+        // game still on
+        else {
+            status = moveColor + ' to move';
+
+            // check?
+            if (game.in_check()) {
+                status += ', ' + moveColor + ' is in check';
+            }
+        }
+
+        $status.html(status);
+    }
+
+    let config = {
+        draggable: true,
+        showNotation: true,
+        pieceTheme: 'xiangqiboardjs-0.3.3/img/xiangqipieces/graphic/{piece}.svg',
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        onChange: onChange
+    };
+
+    function start() {
+        board = Xiangqiboard('myBoard', config);
+        updateStatus();
+    }
+    </script>
+</body>
+
+</html>
